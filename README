@@ -1,0 +1,77 @@
+Macarie Razvan Cristian, 322CB
+Am folosit c++ pentru usurinta de implementare (clase si in special std::vector).
+
+Conectarea intre client si server:
+	Cand un client se conecteaza la server, nu avem de unde sa stim ce id are
+clientul, asa ca ii trimitem un mesaj de tip server/client de tipul id_request
+la care clientul trebuie sa raspunda cu un id_response in care trimite id-ul sau.
+Daca exista deja un client conectat cu id-ul ales, serverul ii trimite un mesaj
+de tipul close connection clientului si care practic da comanda exit pe client.
+	Daca clientul se conecteaza cu succes este adaugat permanent in lista de 
+clienti (daca nu exista deja) si in lista de clienti conectati. Cand se 
+deconecteaza este sters de pe lista de clienti conectati si in lista cu toti 
+clienti are field-ul "conectat" setat la 0.
+	La conectare sau reconectare se afiseaza mesajul de client nou. Aici ar fi
+oarecum o problema pentru ca nu este exact un client nou cineva care s-a 
+reconectat, in schimb este mai mult o noua conexiune. Eu in felul acesta am gandit
+mesajul de "New client connected from... ", se printeaza cand se realizeaza cu
+succes o noua conexiune.
+	Fiecare client are un descriptor ar socketului pe care s-a realizat ultima 
+lui conectare (se actualizeaza la reconectare).
+
+Mesaje de sub/unsub:
+	Clientul poate trimite sub/unsub doar daca a formatat corect comenzile de
+subscribe si unsubscribe, daca nu, primeste un warning in format text la stdout.
+Mesajul pe care il trimite clientul este de tip 2(sub/unsub). Serverul preia 
+mesajul si il parseaza si face error-checking. Daca era deja abonat clientul la
+topic, nu il mai aboneaza iar. Daca nu era abonat la un topic, nu ii da 
+dezabonare. Fiecare client tine minte intr-un field topicurile la care este 
+abonat. Initial voiam sa tin minte pentru fiecare topic ce clienti sunt abonati.
+Ambele implementari aveau neajunsuri: ori am multi clienti abonati la putine 
+topicuri sau multe topicuri la putini clienti, in ambele cazuri irosim memorie.
+
+Foward:
+	Cand un mesaj UDP este primit, verificam daca topicul lui face match cu 
+vreun topic al unui client. Daca face match si clientul e conectat il trimitem
+mai departe. 
+
+Store:
+	Daca face match si clientul e deconectat, dar are store_forward = 1, salvam 
+mesajul, ca o pereche <mesaj, destinatar>. Am avut din nou problema cu un mesaj
+la multi clienti sau multe mesaje la un client, pentru ca puteam stoca si 
+perechea <mesaj, vector<destinatari>> astfel un mesaj care era destinat mai multor
+persoane se salva o singura data. In general am ales implementarea mai usoara,
+pentru ca in worst case ambele metode au deficiente. Se verifica daca se poate
+transmite vreun mesaj din cele stocate cand se reconecteaza cu succes un fost
+client.
+
+Lipirea mesajelor TCP:
+	Din ce am citit TCP lipeste mesajele mai mici in mesaje mai mari cand poate
+ca sa nu iroseasca spatiu. Eu am ales sa transmit obiecte alocate static, pentru
+ca send vrea doar un void* cu inceputul adresei si lungimea. Mesajele mele
+sunt deja destul de mari (chiar daca nu au foarte multi octeti utili) si nu am
+patit sa primesc vreo eroare cand trimit chiar si cu delay de 1ms mesaje din 
+generator.
+
+Mesajele UDP:
+	Cand primesc mesajele UDP le salvez ca obiecte si le alipesc la final, ip-ul
+si portul sursa, pentru a printa la client de unde a venit informatia. Parsarea
+informatiei se face cum este specificat in cerinta.
+	Inainte sa fie transmis un mesaj UDP, trimit un mesaj de tip "avertisment" 
+care semnaleaza faptul ca clientul TCP v-a primi un mesaj de la un topic la care
+este abonat. Am nevoie de asta pentru ca am 2 tipuri de a reprezenta mesajele:
+mesaje speciale intre server si client si mesaje cu date. Eu trebuie sa stiu
+ce fel de mesaj primesc ca sa nu le interpretez prost.
+
+Exit:
+	Cand se foloseste "exit" pe server inainte sa se inchida trimite la toti
+clientii conectati un mesaj de tip close_connection ca sa-i inchida.
+
+	In general am incercat sa folosesc cat mai multe clase si instrumente oop in
+implementare (Clase de mesaje si de clienti). Nu prea am avut neajunsuri 
+provenite de la faptul ca nu aveam structuri bine definite. Singura problema ar
+fi faptul ca avand 2 tipuri de packete (de control intre server si client, si
+de date) trebuie sa trimit un pachet in plus la fiecare mesaj. As fi putut
+remedia problema daca aveam doar un singur tip de mesaj, dar asta ar fi creat
+mai multe complicatii si mi-a fost mult mai usor sa acopar cazurile de eroare
+folosind aceste tipuri de mesaje.
